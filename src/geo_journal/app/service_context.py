@@ -1,6 +1,6 @@
 from typing import NamedTuple
 
-from service_template.clients.sqs import SqsClient
+from geo_journal.clients.sqs import SqsClient
 
 
 class Clients(NamedTuple):

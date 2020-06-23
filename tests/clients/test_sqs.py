@@ -2,7 +2,7 @@ import datetime
 import json
 import uuid
 
-import service_template.clients.sqs as module
+import geo_journal.clients.sqs as module
 
 test_input = {
     "Records": [
