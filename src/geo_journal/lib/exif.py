@@ -1,16 +1,19 @@
-from typing import Tuple
+from typing import NamedTuple
 
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags  # type: ignore
 
 
-def get_lat_long(path: str) -> Tuple[int, int]:
+class Coordinates(NamedTuple):
+    latitude: float
+    longitude: float
+
+
+def get_lat_long(path: str) -> Coordinates:
     img = Image.open(path)
 
-    exif = {
-        ExifTags.TAGS[k]: v
-        for k, v in img.info["parsed_exif"].items()
-        if k in ExifTags.TAGS
-    }
+    print(img.info.keys())
+
+    exif = {ExifTags.TAGS[k]: v for k, v in img.getexif().items() if k in ExifTags.TAGS}
 
     gpsinfo = {
         ExifTags.GPSTAGS.get(key, key): value for key, value in exif["GPSInfo"].items()
@@ -30,4 +33,4 @@ def get_lat_long(path: str) -> Tuple[int, int]:
         ]
     )
 
-    return latitude, longitude
+    return Coordinates(latitude=round(latitude, 6), longitude=round(longitude, 6))
