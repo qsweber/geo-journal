@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import Optional, NamedTuple
 
 from PIL import Image, ExifTags  # type: ignore
 
@@ -8,16 +8,25 @@ class Coordinates(NamedTuple):
     longitude: float
 
 
-def get_lat_long(path: str) -> Coordinates:
+def get_lat_long(path: str) -> Optional[Coordinates]:
     img = Image.open(path)
 
-    print(img.info.keys())
-
     exif = {ExifTags.TAGS[k]: v for k, v in img.getexif().items() if k in ExifTags.TAGS}
+
+    if "GPSInfo" not in exif:
+        return None
 
     gpsinfo = {
         ExifTags.GPSTAGS.get(key, key): value for key, value in exif["GPSInfo"].items()
     }
+
+    if (
+        "GPSLatitude" not in gpsinfo
+        or "GPSLatitudeRef" not in gpsinfo
+        or "GPSLongitude" not in gpsinfo
+        or "GPSLongitudeRef" not in gpsinfo
+    ):
+        return None
 
     latitude = (1 if gpsinfo["GPSLatitudeRef"] == "N" else -1) * sum(
         [

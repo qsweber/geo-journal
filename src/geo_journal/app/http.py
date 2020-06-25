@@ -39,9 +39,18 @@ def upload() -> Response:
 
     coordinates = get_lat_long(path)
 
-    response = jsonify(
-        {"text": {"latitude": coordinates.latitude, "longitude": coordinates.longitude}}
-    )
+    if coordinates:
+        response = jsonify(
+            {
+                "text": {
+                    "latitude": coordinates.latitude,
+                    "longitude": coordinates.longitude,
+                }
+            }
+        )
+    else:
+        response = jsonify({"text": "bad"})
+
     response.headers.add("Access-Control-Allow-Origin", "*")
 
     return typing.cast(Response, response)
