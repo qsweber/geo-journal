@@ -10,6 +10,12 @@
         "events": [],
         "aws_environment_variables": {
             "STAGE": "PROD"
+        },
+        "authorizer": {
+            "type": "COGNITO_USER_POOLS",
+            "provider_arns": [
+                "arn:aws:cognito-idp:us-west-2:120356305272:userpool/us-west-2_EJmcdZc9Z"
+            ]
         }
     }
 }
