@@ -1,5 +1,6 @@
 Boto3
 Flask
+pyjwt
 raven[flask]
 Pillow
 werkzeug
