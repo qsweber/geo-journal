@@ -11,6 +11,7 @@
         "aws_environment_variables": {
             "STAGE": "PROD"
         },
+        "cors": true,
         "authorizer": {
             "type": "COGNITO_USER_POOLS",
             "provider_arns": [
