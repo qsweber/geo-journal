@@ -63,4 +63,3 @@ class S3Client:
 #     )
 
 # s3.head_object(Bucket=BUCKET_NAME, Key="quinn/foo6")["Metadata"]
-
