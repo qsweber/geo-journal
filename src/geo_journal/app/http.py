@@ -9,7 +9,7 @@ from raven import Client  # type: ignore
 from raven.contrib.flask import Sentry  # type: ignore
 from raven.transport.requests import RequestsHTTPTransport  # type: ignore
 
-from geo_journal.lib.jwt import decode
+from geo_journal.lib.jwt import decode, DecodedJwt
 
 app = Flask(__name__)
 sentry = Sentry(app, client=Client(transport=RequestsHTTPTransport,),)
@@ -54,17 +54,41 @@ def status() -> Response:
     return typing.cast(Response, response)
 
 
-@app.route("/api/v0/user/<id>", methods=["GET"])
-def user(id: str) -> Response:
-    logger.info("recieved request with args {}".format(json.dumps(request.args)))
+class ImagesRequest(typing.NamedTuple):
+    user_id: str
 
-    decoded = decode(request.headers["Authorization"])
 
-    response = jsonify({"id": decoded.id, "email": decoded.email})
+class Image(typing.NamedTuple):
+    latitude: Decimal
+    longitude: Decimal
+    name: str
 
-    response.headers.add("Access-Control-Allow-Origin", "*")
 
-    return typing.cast(Response, response)
+class ImagesResult(typing.NamedTuple):
+    images: typing.List[Image]
+
+
+def images_request_converter(r: Request, jwt: DecodedJwt) -> ImagesRequest:
+    return ImagesRequest(user_id=jwt.id)
+
+
+def images_result_converter(images_result: ImagesResult) -> typing.Any:
+    return {
+        "images": [
+            {
+                "latitude": image.latitude,
+                "longitude": image.longitude,
+                "name": image.name,
+            }
+            for image in images_result.images
+        ]
+    }
+
+
+@app.route("/api/v0/images", methods=["GET"])
+@typedRouteAuth(images_request_converter, images_result_converter)
+def user(images_request: ImagesRequest) -> ImagesResult:
+    return ImagesResult(images=[])
 
 
 class Foo(typing.NamedTuple):
