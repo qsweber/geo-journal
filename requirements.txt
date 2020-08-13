@@ -1,11 +1,8 @@
 Boto3
 cryptography
 Flask
-<<<<<<< HEAD
 pyjwt
-=======
 jsonschema
->>>>>>> template/master
 raven[flask]
 Pillow
 werkzeug

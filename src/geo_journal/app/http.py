@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 import logging
 import json
@@ -10,7 +11,9 @@ from raven import Client  # type: ignore
 from raven.contrib.flask import Sentry  # type: ignore
 from raven.transport.requests import RequestsHTTPTransport  # type: ignore
 
-from geo_journal.lib.jwt import decode, DecodedJwt
+from geo_journal.lib.jwt import decode
+from geo_journal.app.service_context import service_context
+
 
 app = Flask(__name__)
 sentry = Sentry(app, client=Client(transport=RequestsHTTPTransport,),)
@@ -41,7 +44,11 @@ def authenticate(
     func: typing.Callable[..., Response]
 ) -> typing.Callable[..., Response]:
     def what_gets_called(*args: typing.Any, **kwargs: typing.Any) -> Response:
-        jwt = decode(request.headers["Authorization"])
+        try:
+            jwt = decode(request.headers["Authorization"])
+        except Exception:
+            return Response(status=401)
+
         g.jwt = jwt
         return func(*args, **kwargs)
 
@@ -61,7 +68,37 @@ def status() -> Response:
 @app.route("/api/v0/images", methods=["GET"])
 @authenticate
 def images() -> Response:
+    logger.info("recieve request for user {}".format(g.jwt.id))
     response = jsonify({"images": []})
+    response.headers.add("Access-Control-Allow-Origin", "*")
+
+    return typing.cast(Response, response)
+
+
+@app.route("/api/v0/presign", methods=["POST"])
+@authenticate
+@schema(
+    {
+        "type": "object",
+        "properties": {
+            "latitude": {"type": "string"},
+            "longitude": {"type": "string"},
+            "taken_at": {"type": "string"},
+            "name": {"type": "string"},
+        },
+        "required": ["latitude", "longitude", "taken_at", "name"],
+    }
+)
+def presign() -> Response:
+    url, data = service_context.clients.s3.create_presigned_post(
+        g.jwt.id,
+        request.form["name"],
+        datetime.fromtimestamp(request.form["taken_at"]),
+        Decimal(request.form["latitude"]),
+        Decimal(request.form["longitude"]),
+    )
+    logger.info("recieve request for user {}".format(g.jwt.id))
+    response = jsonify({"url": url, "data": data})
     response.headers.add("Access-Control-Allow-Origin", "*")
 
     return typing.cast(Response, response)

@@ -39,7 +39,7 @@ jobs:
           pip install -e .
 
       - name: deploy production
-        if: github.event_name == 'push'
+        # if: github.event_name == 'push'
         run: |
           source deploy-env/bin/activate
           python deploy_helper.py production
