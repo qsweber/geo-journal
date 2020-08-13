@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from functools import wraps
 import logging
 import json
 import typing
@@ -26,6 +27,7 @@ def schema(
     def wrapper(
         func: typing.Callable[..., Response],
     ) -> typing.Callable[..., Response]:
+        @wraps(func)
         def what_gets_called(*args: typing.Any, **kwargs: typing.Any) -> Response:
             if request.method == "GET":
                 validate(instance=request.args, schema=schema)
@@ -43,6 +45,7 @@ def schema(
 def authenticate(
     func: typing.Callable[..., Response]
 ) -> typing.Callable[..., Response]:
+    @wraps(func)
     def what_gets_called(*args: typing.Any, **kwargs: typing.Any) -> Response:
         try:
             jwt = decode(request.headers["Authorization"])
