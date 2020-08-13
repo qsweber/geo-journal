@@ -96,7 +96,7 @@ def presign() -> Response:
     url, data = service_context.clients.s3.create_presigned_post(
         g.jwt.id,
         request.form["name"],
-        datetime.fromtimestamp(request.form["taken_at"]),
+        datetime.fromtimestamp(int(request.form["taken_at"])),
         Decimal(request.form["latitude"]),
         Decimal(request.form["longitude"]),
     )
