@@ -45,6 +45,9 @@ class S3Client:
         self,
         user_id: str,
     ) -> typing.List[Image]:
+        s3_objects = self.s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=user_id)
+        if "Contents" not in s3_objects:
+            return []
 
         return [
             self._image_from_raw_metadata(
@@ -52,9 +55,7 @@ class S3Client:
                     "Metadata"
                 ]
             )
-            for s3_object in self.s3.list_objects_v2(
-                Bucket=BUCKET_NAME, Prefix=user_id
-            )["Contents"]
+            for s3_object in s3_objects["Contents"]
         ]
 
     def _image_from_raw_metadata(self, metadata: typing.Dict[str, str]) -> Image:
