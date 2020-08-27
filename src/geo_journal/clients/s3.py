@@ -42,7 +42,7 @@ class S3Client:
                 {"x-amz-meta-name": name},
                 {"x-amz-meta-latitude": str(latitude)},
                 {"x-amz-meta-longitude": str(longitude)},
-                {"x-amz-meta-taken": str(taken_at.timestamp())},
+                {"x-amz-meta-taken": str(int(taken_at.timestamp()))},
             ],
             ExpiresIn=3600,
         )
