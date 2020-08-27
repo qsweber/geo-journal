@@ -104,7 +104,20 @@ def status() -> Response:
 )
 def images() -> Response:
     logger.info("recieve request for user {}".format(g.jwt.id))
-    response = jsonify({"images": service_context.clients.s3.get_images(g.jwt.id)})
+    images = service_context.clients.s3.get_images(g.jwt.id)
+    response = jsonify(
+        {
+            "images": [
+                {
+                    "latitude": str(image.latitude),
+                    "longitude": str(image.longitude),
+                    "taken_at": str(int(image.taken_at.timestamp())),
+                    "name": image.name,
+                }
+                for image in images
+            ]
+        }
+    )
     response.headers.add("Access-Control-Allow-Origin", "*")
 
     return typing.cast(Response, response)
