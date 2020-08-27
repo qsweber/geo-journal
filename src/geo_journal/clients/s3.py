@@ -12,11 +12,14 @@ BUCKET_NAME = "geojournal-uploads"
 
 class S3Client:
     def __init__(self) -> None:
-        self.s3 = boto3.client(
-            "s3",
-            aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
-            aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
-        )
+        if os.environ["STAGE"] == "PROD":
+            self.s3 = boto3.client(
+                "s3",
+                aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
+                aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
+            )
+        else:
+            self.s3 = boto3.client("s3")
 
     def create_presigned_post(
         self,
