@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 import typing
+import os
 
 from uuid import uuid4
 import boto3  # type: ignore
@@ -13,8 +14,8 @@ class S3Client:
     def __init__(self) -> None:
         self.s3 = boto3.client(
             "s3",
-            # aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
-            # aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
+            aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
+            aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
         )
 
     def create_presigned_post(
