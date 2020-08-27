@@ -12,6 +12,7 @@ from raven import Client  # type: ignore
 from raven.contrib.flask import Sentry  # type: ignore
 from raven.transport.requests import RequestsHTTPTransport  # type: ignore
 
+from geo_journal.clients.s3 import Image
 from geo_journal.lib.jwt import decode
 from geo_journal.app.service_context import service_context
 
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 def schema(
-    schema: typing.Any,
+    inputSchema: typing.Dict[str, typing.Any],
+    outputSchema: typing.Dict[str, typing.Any],
 ) -> typing.Callable[[typing.Callable[..., Response]], typing.Callable[..., Response]]:
     def wrapper(
         func: typing.Callable[..., Response],
@@ -35,12 +37,17 @@ def schema(
         @wraps(func)
         def what_gets_called(*args: typing.Any, **kwargs: typing.Any) -> Response:
             if request.method == "GET":
-                validate(instance=request.args, schema=schema)
+                validate(instance=request.args, schema=inputSchema)
             elif request.method == "POST":
-                validate(instance=request.form, schema=schema)
+                validate(instance=request.form, schema=inputSchema)
             else:
                 raise Exception("unexpected method {}".format(request.method))
-            return func(*args, **kwargs)
+
+            result = func(*args, **kwargs)
+
+            validate(instance=json.loads(result.data), schema=outputSchema)
+
+            return result
 
         return what_gets_called
 
@@ -75,9 +82,29 @@ def status() -> Response:
 
 @app.route("/api/v0/images", methods=["GET"])
 @authenticate
+@schema(
+    {},
+    {
+        "type": "object",
+        "properties": {
+            "images": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "latitude": {"type": "string"},
+                        "longitude": {"type": "string"},
+                        "taken_at": {"type": "string"},
+                        "name": {"type": "string"},
+                    },
+                },
+            }
+        },
+    },
+)
 def images() -> Response:
     logger.info("recieve request for user {}".format(g.jwt.id))
-    response = jsonify({"images": []})
+    response = jsonify({"images": service_context.clients.s3.get_images(g.jwt.id)})
     response.headers.add("Access-Control-Allow-Origin", "*")
 
     return typing.cast(Response, response)
@@ -95,15 +122,25 @@ def images() -> Response:
             "name": {"type": "string"},
         },
         "required": ["latitude", "longitude", "taken_at", "name"],
-    }
+    },
+    {
+        "type": "object",
+        "properties": {
+            "data": {},
+            "url": {"type": "string"},
+        },
+        "required": ["data", "url"],
+    },
 )
 def presign() -> Response:
     url, data = service_context.clients.s3.create_presigned_post(
         g.jwt.id,
-        request.form["name"],
-        datetime.fromtimestamp(int(request.form["taken_at"])),
-        Decimal(request.form["latitude"]),
-        Decimal(request.form["longitude"]),
+        Image(
+            name=request.form["name"],
+            taken_at=datetime.fromtimestamp(int(request.form["taken_at"])),
+            latitude=Decimal(request.form["latitude"]),
+            longitude=Decimal(request.form["longitude"]),
+        ),
     )
     logger.info("recieve request for user {}".format(g.jwt.id))
     response = jsonify({"url": url, "data": data})
