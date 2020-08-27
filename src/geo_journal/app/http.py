@@ -17,7 +17,12 @@ from geo_journal.app.service_context import service_context
 
 
 app = Flask(__name__)
-sentry = Sentry(app, client=Client(transport=RequestsHTTPTransport,),)
+sentry = Sentry(
+    app,
+    client=Client(
+        transport=RequestsHTTPTransport,
+    ),
+)
 logger = logging.getLogger(__name__)
 
 

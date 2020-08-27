@@ -11,4 +11,4 @@ class ServiceContext(NamedTuple):
     clients: Clients
 
 
-service_context = ServiceContext(clients=Clients(s3=S3Client(),))
+service_context = ServiceContext(clients=Clients(s3=S3Client()))
