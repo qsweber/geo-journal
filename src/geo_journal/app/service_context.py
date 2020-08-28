@@ -1,14 +1,14 @@
 from typing import NamedTuple
 
-from geo_journal.clients.cognito import CognitoClient
+from geo_journal.clients.s3 import S3Client
 
 
 class Clients(NamedTuple):
-    cognito: CognitoClient
+    s3: S3Client
 
 
 class ServiceContext(NamedTuple):
     clients: Clients
 
 
-service_context = ServiceContext(clients=Clients(cognito=CognitoClient(),))
+service_context = ServiceContext(clients=Clients(s3=S3Client()))

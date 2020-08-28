@@ -2,6 +2,7 @@ Boto3
 cryptography
 Flask
 pyjwt
+jsonschema
 raven[flask]
 Pillow
 werkzeug
