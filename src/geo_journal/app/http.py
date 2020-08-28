@@ -12,7 +12,7 @@ from raven import Client  # type: ignore
 from raven.contrib.flask import Sentry  # type: ignore
 from raven.transport.requests import RequestsHTTPTransport  # type: ignore
 
-from geo_journal.clients.s3 import Image
+from geo_journal.clients.s3 import ImageMetadata
 from geo_journal.lib.jwt import decode
 from geo_journal.app.service_context import service_context
 
@@ -96,6 +96,7 @@ def status() -> Response:
                         "longitude": {"type": "string"},
                         "taken_at": {"type": "string"},
                         "name": {"type": "string"},
+                        "presigned_url": {"type": "string"},
                     },
                 },
             }
@@ -109,10 +110,11 @@ def images() -> Response:
         {
             "images": [
                 {
-                    "latitude": str(image.latitude),
-                    "longitude": str(image.longitude),
-                    "taken_at": str(int(image.taken_at.timestamp())),
-                    "name": image.name,
+                    "latitude": str(image.metadata.latitude),
+                    "longitude": str(image.metadata.longitude),
+                    "taken_at": str(int(image.metadata.taken_at.timestamp())),
+                    "name": image.metadata.name,
+                    "presigned_url": image.presigned_url,
                 }
                 for image in images
             ]
@@ -148,7 +150,7 @@ def images() -> Response:
 def presign() -> Response:
     url, data = service_context.clients.s3.create_presigned_post(
         g.jwt.id,
-        Image(
+        ImageMetadata(
             name=request.form["name"],
             taken_at=datetime.fromtimestamp(int(request.form["taken_at"])),
             latitude=Decimal(request.form["latitude"]),
