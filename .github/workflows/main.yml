@@ -2,45 +2,62 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-go@v5.5.0
         with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v1
+          go-version: 1.24.1
+      - run: make build-lambda
+      - run: go version
+      - uses: actions/upload-artifact@v4.6.2
         with:
-          python-version: 3.8
-      - run: pip install tox
-      - run: tox
-  deploy:
+          name: build
+          path: ./handler.zip
+  deploy_dev:
+    runs-on: ubuntu-latest
+    environment: dev
     needs: [build]
-    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version: 1.24.1
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: build
+      - uses: pulumi/actions@v4
+      - run: cd infrastructure && pulumi login ${{ secrets.PULUMI_CLOUD_URL }} && cd ..
+      - run: cd infrastructure && pulumi up --stack dev --non-interactive --yes && cd ..
     env:
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: us-west-2
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+  deploy_prod:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: prod
+    needs: [build]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-go@v5.5.0
         with:
-          python-version: 3.8
-      - run: |
-          python3.8 -m venv deploy-env
-          source deploy-env/bin/activate
-          pip install -r requirements.txt
-          pip install zappa
-          pip install -e .
-
-      - name: deploy production
-        if: github.event_name == 'push'
-        run: |
-          source deploy-env/bin/activate
-          python deploy_helper.py production
-          zappa update production
+          go-version: 1.24.1
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: build
+      - uses: pulumi/actions@v4
+      - run: cd infrastructure && pulumi login ${{ secrets.PULUMI_CLOUD_URL }} && cd ..
+      - run: cd infrastructure && pulumi up --stack prod --non-interactive --yes && cd ..
+    env:
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
