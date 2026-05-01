@@ -19,8 +19,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const defaultBucketName = "geojournal-uploads"
-
 type ImageMetadata struct {
 	Name      string
 	TakenAt   time.Time
@@ -48,7 +46,7 @@ type s3Client struct {
 func NewS3Client() (S3Client, error) {
 	bucket := os.Getenv("GEO_JOURNAL_UPLOAD_BUCKET")
 	if bucket == "" {
-		bucket = defaultBucketName
+		return nil, fmt.Errorf("GEO_JOURNAL_UPLOAD_BUCKET environment variable is required")
 	}
 
 	region := os.Getenv("AWS_REGION")
@@ -56,7 +54,7 @@ func NewS3Client() (S3Client, error) {
 		region = os.Getenv("AWS_DEFAULT_REGION")
 	}
 	if region == "" {
-		region = "us-west-2"
+		return nil, fmt.Errorf("AWS_REGION or AWS_DEFAULT_REGION environment variable is required")
 	}
 
 	sess, err := session.NewSession(&aws.Config{Region: aws.String(region)})

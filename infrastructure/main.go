@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/apigateway"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
+	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -92,15 +95,68 @@ func main() {
 			return err
 		}
 
+		// Create the S3 bucket for image uploads
+		bucketName := projectStackName + "-uploads"
+		uploadBucket, err := s3.NewBucketV2(ctx, bucketName, &s3.BucketV2Args{
+			Bucket: pulumi.String(bucketName),
+			Tags: pulumi.StringMap{
+				"Project": pulumi.String(ctx.Project()),
+				"Stack":   pulumi.String(ctx.Stack()),
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Block all public access to the bucket
+		_, err = s3.NewBucketPublicAccessBlock(ctx, bucketName+"-public-access-block", &s3.BucketPublicAccessBlockArgs{
+			Bucket:                uploadBucket.ID(),
+			BlockPublicAcls:       pulumi.Bool(true),
+			BlockPublicPolicy:     pulumi.Bool(true),
+			IgnorePublicAcls:      pulumi.Bool(true),
+			RestrictPublicBuckets: pulumi.Bool(true),
+		})
+		if err != nil {
+			return err
+		}
+
+		// Attach an IAM policy granting the Lambda role access to the upload bucket
+		s3Policy, err := iam.NewRolePolicy(ctx, projectStackName+"-lambda-s3-policy", &iam.RolePolicyArgs{
+			Role: role.Name,
+			Policy: uploadBucket.Arn.ApplyT(func(arn string) string {
+				return fmt.Sprintf(`{
+	"Version": "2012-10-17",
+	"Statement": [{
+		"Effect": "Allow",
+		"Action": [
+			"s3:PutObject",
+			"s3:GetObject",
+			"s3:HeadObject",
+			"s3:ListBucket"
+		],
+		"Resource": [
+			"%s",
+			"%s/*"
+		]
+	}]
+}`, arn, arn)
+			}).(pulumi.StringOutput),
+		})
+		if err != nil {
+			return err
+		}
+
 		// Build environment variables for Lambda
 		environment := &lambda.FunctionEnvironmentArgs{}
-		if cognitoRegion != "" && cognitoUserPoolId != "" && cognitoClientId != "" {
-			environment.Variables = pulumi.StringMap{
-				"COGNITO_REGION":       pulumi.String(cognitoRegion),
-				"COGNITO_USER_POOL_ID": pulumi.String(cognitoUserPoolId),
-				"COGNITO_CLIENT_ID":    pulumi.String(cognitoClientId),
-			}
+		envVars := pulumi.StringMap{
+			"GEO_JOURNAL_UPLOAD_BUCKET": pulumi.String(bucketName),
 		}
+		if cognitoRegion != "" && cognitoUserPoolId != "" && cognitoClientId != "" {
+			envVars["COGNITO_REGION"] = pulumi.String(cognitoRegion)
+			envVars["COGNITO_USER_POOL_ID"] = pulumi.String(cognitoUserPoolId)
+			envVars["COGNITO_CLIENT_ID"] = pulumi.String(cognitoClientId)
+		}
+		environment.Variables = envVars
 
 		// Create the lambda using the args.
 		function, err := lambda.NewFunction(
@@ -113,7 +169,7 @@ func main() {
 				Code:        pulumi.NewFileArchive("../handler.zip"),
 				Environment: environment,
 			},
-			pulumi.DependsOn([]pulumi.Resource{logPolicy}),
+			pulumi.DependsOn([]pulumi.Resource{logPolicy, s3Policy}),
 		)
 		if err != nil {
 			return err
@@ -198,6 +254,7 @@ func main() {
 
 		ctx.Export("Lambda Name", function.Name)
 		ctx.Export("invocation URL", pulumi.Sprintf("https://%s.execute-api.%s.amazonaws.com/%s/{message}", gateway.ID(), region.Name, ctx.Stack()))
+		ctx.Export("upload bucket", uploadBucket.Bucket)
 
 		return nil
 	})
