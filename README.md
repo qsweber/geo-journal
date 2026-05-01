@@ -1,4 +1,4 @@
-# Go Template
+# Geo Journal API
 
 This repository contains:
 
@@ -25,38 +25,52 @@ The server listens on port 8080.
 
 ### Endpoints
 
-1. Health check:
+1. Service status:
 
 ```bash
-curl -i http://localhost:8080/ping
+curl -i http://localhost:8080/api/v0/status
 ```
 
-2. Protected foo route without auth (expected 401):
+2. List images without auth (expected 401):
 
 ```bash
-curl -i http://localhost:8080/foo
+curl -i http://localhost:8080/api/v0/images
 ```
 
-3. Protected foo route with mock auth (expected 200):
+3. List images with JWT auth (expected 200 with a valid token):
 
 ```bash
-curl -i -H "Authorization: Bearer dev-token" http://localhost:8080/foo
+curl -i -H "Authorization: <jwt-token>" http://localhost:8080/api/v0/images
 ```
 
-Expected body for successful foo request:
+4. Create an upload presign form:
+
+```bash
+curl -i -X POST \
+	-H "Authorization: <jwt-token>" \
+	-H "Content-Type: application/x-www-form-urlencoded" \
+	--data "latitude=45.12&longitude=-122.64&taken_at=1714000000&name=my-photo.jpg" \
+	http://localhost:8080/api/v0/presign
+```
+
+Expected body for successful status request:
 
 ```json
-{"baz": "example"}
+{"text":"ok"}
 ```
 
 ## Local Auth Behavior
 
 For local development, cmd/api/main.go uses a mock token verifier.
 
-- Any request to /foo must still include an Authorization header in Bearer format.
+- Protected routes still require an Authorization header in Bearer format.
 - The token value is not validated against Cognito in local mode.
 
-This keeps local development simple while preserving authenticated request flow.
+## S3 Behavior
+
+- Upload presign responses include form-style `url` and `data` fields to preserve old client behavior.
+- Images are listed from the per-user S3 prefix and returned with string `latitude`, `longitude`, and `taken_at` fields.
+- Default upload bucket is `geojournal-uploads` and can be overridden with `GEO_JOURNAL_UPLOAD_BUCKET`.
 
 ## Lambda Auth Behavior
 

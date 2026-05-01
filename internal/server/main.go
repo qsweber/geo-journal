@@ -1,12 +1,17 @@
 package server
 
 type Server interface {
-	Ping() (PingOutput, error)
-	Foo(input FooInput) (FooOutput, error)
+	Status() (StatusOutput, error)
+	Images(userID string) (ImagesOutput, error)
+	Presign(userID string, input PresignInput) (PresignOutput, error)
 }
 
-type ServerImpl struct{}
+type ServerImpl struct {
+	s3      S3Client
+	initErr error
+}
 
 func New() Server {
-	return &ServerImpl{}
+	client, err := NewS3Client()
+	return &ServerImpl{s3: client, initErr: err}
 }

@@ -3,4 +3,4 @@ config:
   aws:region: us-west-2
   cognitoRegion: us-west-2
   cognitoUserPoolId: us-west-2_snqq05ZNY
-  cognitoClientId: gfpfndoce6rd0dqkeoseb768c
+  cognitoClientId: 1lg8ab88foqkg9upe0v3t7krs6
