@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -201,19 +202,27 @@ func (c *s3Client) getImage(key string) (Image, error) {
 		return Image{}, fmt.Errorf("presign get object: %w", err)
 	}
 
+	// Go's net/http canonicalizes response header keys to Title-Case, so the
+	// AWS SDK returns metadata keys like "Latitude" instead of "latitude".
+	// Normalize all keys to lowercase for consistent lookup.
+	rawMetadata := make(map[string]*string, len(head.Metadata))
+	for k, v := range head.Metadata {
+		rawMetadata[strings.ToLower(k)] = v
+	}
+
 	takenAt := time.Unix(0, 0).UTC()
-	if head.Metadata["taken"] != nil {
-		takenUnix, parseErr := strconv.ParseInt(*head.Metadata["taken"], 10, 64)
+	if rawMetadata["taken"] != nil {
+		takenUnix, parseErr := strconv.ParseInt(*rawMetadata["taken"], 10, 64)
 		if parseErr == nil {
 			takenAt = time.Unix(takenUnix, 0).UTC()
 		}
 	}
 
 	metadata := ImageMetadata{
-		Name:      getMetadataValue(head.Metadata, "name"),
+		Name:      getMetadataValue(rawMetadata, "name"),
 		TakenAt:   takenAt,
-		Latitude:  getMetadataValue(head.Metadata, "latitude"),
-		Longitude: getMetadataValue(head.Metadata, "longitude"),
+		Latitude:  getMetadataValue(rawMetadata, "latitude"),
+		Longitude: getMetadataValue(rawMetadata, "longitude"),
 	}
 
 	return Image{Metadata: metadata, PresignedURL: presignedURL}, nil

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 
 	"github.com/qsweber/geo-journal/internal/auth"
@@ -45,7 +47,7 @@ func authenticateRequest(ctx context.Context, req Request, tokenVerifier TokenVe
 	}
 	claims, err := tokenVerifier.VerifyToken(ctx, token)
 	if err != nil {
-		return nil, errors.New("failed to verify token")
+		return nil, fmt.Errorf("failed to verify token: %w", err)
 	}
 	return claims, nil
 }
@@ -60,50 +62,57 @@ func corsHeaders() map[string]string {
 func jsonResponse(statusCode int, payload any) Response {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return Response{StatusCode: 500, Headers: corsHeaders()}
+		return errorResponse(500, err)
 	}
+	return Response{StatusCode: statusCode, Body: string(body), Headers: corsHeaders()}
+}
+
+func errorResponse(statusCode int, err error) Response {
+	log.Printf("error %d: %v", statusCode, err)
+	body, _ := json.Marshal(map[string]string{"error": err.Error()})
 	return Response{StatusCode: statusCode, Body: string(body), Headers: corsHeaders()}
 }
 
 func Handler(ctx context.Context, req Request, srv server.Server, tokenVerifier TokenVerifier) Response {
 	method := strings.ToUpper(req.Method)
+	log.Printf("%s %s", method, req.Path)
 
 	switch req.Path {
 	case "/api/v0/status":
 		if method != "GET" {
-			return Response{StatusCode: 405, Headers: corsHeaders()}
+			return errorResponse(405, errors.New("method not allowed"))
 		}
 
 		result, err := srv.Status()
 		if err != nil {
-			return Response{StatusCode: 500, Headers: corsHeaders()}
+			return errorResponse(500, err)
 		}
 
 		return jsonResponse(200, result)
 	case "/api/v0/images":
 		if method != "GET" {
-			return Response{StatusCode: 405, Headers: corsHeaders()}
+			return errorResponse(405, errors.New("method not allowed"))
 		}
 
 		claims, err := authenticateRequest(ctx, req, tokenVerifier)
 		if err != nil {
-			return Response{StatusCode: 401, Headers: corsHeaders()}
+			return errorResponse(401, err)
 		}
 
 		output, err := srv.Images(claims.CognitoUser)
 		if err != nil {
-			return Response{StatusCode: 500, Headers: corsHeaders()}
+			return errorResponse(500, err)
 		}
 
 		return jsonResponse(200, output)
 	case "/api/v0/presign":
 		if method != "POST" {
-			return Response{StatusCode: 405, Headers: corsHeaders()}
+			return errorResponse(405, errors.New("method not allowed"))
 		}
 
 		claims, err := authenticateRequest(ctx, req, tokenVerifier)
 		if err != nil {
-			return Response{StatusCode: 401, Headers: corsHeaders()}
+			return errorResponse(401, err)
 		}
 
 		input := server.PresignInput{
@@ -113,17 +122,17 @@ func Handler(ctx context.Context, req Request, srv server.Server, tokenVerifier 
 			Name:      req.Form["name"],
 		}
 		if input.Latitude == "" || input.Longitude == "" || input.TakenAt == "" || input.Name == "" {
-			return Response{StatusCode: 400, Headers: corsHeaders()}
+			return errorResponse(400, errors.New("latitude, longitude, taken_at and name are required"))
 		}
 
 		output, err := srv.Presign(claims.CognitoUser, input)
 		if err != nil {
-			return Response{StatusCode: 500, Headers: corsHeaders()}
+			return errorResponse(500, err)
 		}
 
 		return jsonResponse(200, output)
 
 	default:
-		return Response{StatusCode: 404, Headers: corsHeaders()}
+		return errorResponse(404, errors.New("not found"))
 	}
 }
