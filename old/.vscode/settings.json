@@ -1,0 +1,13 @@
+{
+  "editor.tabSize": 4,
+  "python.envFile": "${workspaceRoot}/.tox/py38",
+  "python.pythonPath": "${workspaceRoot}/.tox/py38/bin/python",
+  "python.linting.flake8Enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.mypyEnabled": true,
+  "python.linting.mypyArgs": [
+    "--strict"
+  ],
+  "editor.formatOnSave": true,
+  "python.formatting.provider": "black"
+}

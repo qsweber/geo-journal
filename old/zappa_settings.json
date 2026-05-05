@@ -1,0 +1,16 @@
+{
+    "production": {
+        "app_function": "src.geo_journal.app.http.app",
+        "aws_region": "us-west-2",
+        "project_name": "geo-journal",
+        "runtime": "python3.8",
+        "s3_bucket": "zappa-50a0hj80j",
+        "log_level": "INFO",
+        "timeout_seconds": 55,
+        "events": [],
+        "aws_environment_variables": {
+            "STAGE": "PROD"
+        },
+        "cors": true
+    }
+}

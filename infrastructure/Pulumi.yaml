@@ -1,0 +1,3 @@
+name: geo-journal
+runtime: go
+description: Basic template of an AWS lambda With API Gateway
