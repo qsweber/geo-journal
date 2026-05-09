@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -38,6 +40,8 @@ type S3Client interface {
 	GetImages(userID string) ([]Image, error)
 	DeleteImage(userID, imageID string) error
 }
+
+var ErrImageNotFound = errors.New("image not found")
 
 type s3Client struct {
 	bucket string
@@ -240,7 +244,20 @@ func getMetadataValue(metadata map[string]*string, key string) string {
 
 func (c *s3Client) DeleteImage(userID, imageID string) error {
 	key := path.Join(userID, imageID)
-	_, err := c.svc.DeleteObject(&s3.DeleteObjectInput{
+
+	_, err := c.svc.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var awsErr awserr.Error
+		if errors.As(err, &awsErr) && (awsErr.Code() == "NotFound" || awsErr.Code() == s3.ErrCodeNoSuchKey) {
+			return ErrImageNotFound
+		}
+		return fmt.Errorf("head object: %w", err)
+	}
+
+	_, err = c.svc.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(key),
 	})

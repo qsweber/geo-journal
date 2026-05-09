@@ -1,10 +1,19 @@
 package server
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/qsweber/geo-journal/internal/clients"
+)
 
 type DeleteInput struct {
 	ImageID string
 }
+
+var (
+	ErrImageIDRequired = errors.New("imageID is required")
+	ErrImageNotFound   = errors.New("image not found")
+)
 
 func (s *ServerImpl) Delete(userID string, input DeleteInput) error {
 	if s.initErr != nil {
@@ -12,8 +21,12 @@ func (s *ServerImpl) Delete(userID string, input DeleteInput) error {
 	}
 
 	if input.ImageID == "" {
-		return errors.New("image_id is required")
+		return ErrImageIDRequired
 	}
 
-	return s.s3.DeleteImage(userID, input.ImageID)
+	err := s.s3.DeleteImage(userID, input.ImageID)
+	if errors.Is(err, clients.ErrImageNotFound) {
+		return ErrImageNotFound
+	}
+	return err
 }
