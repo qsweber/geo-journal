@@ -23,6 +23,10 @@ func (s testServer) Presign(userID string, input server.PresignInput) (server.Pr
 	return server.PresignOutput{}, nil
 }
 
+func (s testServer) Delete(userID string, input server.DeleteInput) error {
+	return nil
+}
+
 type failingTokenVerifier struct{}
 
 func (v failingTokenVerifier) VerifyToken(ctx context.Context, tokenString string) (*auth.Claims, error) {

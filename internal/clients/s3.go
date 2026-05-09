@@ -1,4 +1,4 @@
-package server
+package clients
 
 import (
 	"crypto/hmac"
@@ -28,6 +28,7 @@ type ImageMetadata struct {
 }
 
 type Image struct {
+	ID           string
 	Metadata     ImageMetadata
 	PresignedURL string
 }
@@ -35,6 +36,7 @@ type Image struct {
 type S3Client interface {
 	CreatePresignedPost(userID string, imageMetadata ImageMetadata) (string, map[string]string, error)
 	GetImages(userID string) ([]Image, error)
+	DeleteImage(userID, imageID string) error
 }
 
 type s3Client struct {
@@ -225,7 +227,7 @@ func (c *s3Client) getImage(key string) (Image, error) {
 		Longitude: getMetadataValue(rawMetadata, "longitude"),
 	}
 
-	return Image{Metadata: metadata, PresignedURL: presignedURL}, nil
+	return Image{ID: path.Base(key), Metadata: metadata, PresignedURL: presignedURL}, nil
 }
 
 func getMetadataValue(metadata map[string]*string, key string) string {
@@ -234,4 +236,16 @@ func getMetadataValue(metadata map[string]*string, key string) string {
 		return ""
 	}
 	return *value
+}
+
+func (c *s3Client) DeleteImage(userID, imageID string) error {
+	key := path.Join(userID, imageID)
+	_, err := c.svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("delete object: %w", err)
+	}
+	return nil
 }

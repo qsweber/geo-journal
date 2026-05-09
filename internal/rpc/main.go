@@ -133,6 +133,25 @@ func Handler(ctx context.Context, req Request, srv server.Server, tokenVerifier 
 		return jsonResponse(200, output)
 
 	default:
+		// Handle DELETE /api/v0/images/{imageID}
+		if method == "DELETE" && strings.HasPrefix(req.Path, "/api/v0/images/") {
+			imagePath := strings.TrimPrefix(req.Path, "/api/v0/images/")
+			if imagePath != "" && !strings.Contains(imagePath, "/") {
+				claims, err := authenticateRequest(ctx, req, tokenVerifier)
+				if err != nil {
+					return errorResponse(401, err)
+				}
+
+				input := server.DeleteInput{ImageID: imagePath}
+				err = srv.Delete(claims.CognitoUser, input)
+				if err != nil {
+					return errorResponse(500, err)
+				}
+
+				return jsonResponse(204, nil)
+			}
+		}
+
 		return errorResponse(404, errors.New("not found"))
 	}
 }
