@@ -251,7 +251,7 @@ func (c *s3Client) DeleteImage(userID, imageID string) error {
 	})
 	if err != nil {
 		var awsErr awserr.Error
-		if errors.As(err, &awsErr) && (awsErr.Code() == "NotFound" || awsErr.Code() == s3.ErrCodeNoSuchKey) {
+		if errors.As(err, &awsErr) && awsErr.Code() == "NotFound" {
 			return ErrImageNotFound
 		}
 		return fmt.Errorf("head object: %w", err)
