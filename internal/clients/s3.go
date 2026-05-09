@@ -245,6 +245,8 @@ func getMetadataValue(metadata map[string]*string, key string) string {
 func (c *s3Client) DeleteImage(userID, imageID string) error {
 	key := path.Join(userID, imageID)
 
+	// We intentionally preflight with HeadObject so DELETE can return 404 when the
+	// object does not exist for this user, matching the API contract.
 	_, err := c.svc.HeadObject(&s3.HeadObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(key),
