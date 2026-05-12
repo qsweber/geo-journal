@@ -55,6 +55,7 @@ Returns all images uploaded by the authenticated user.
 {
   "images": [
     {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
       "name": "sunset.jpg",
       "latitude": "45.5231",
       "longitude": "-122.6765",
@@ -67,6 +68,7 @@ Returns all images uploaded by the authenticated user.
 
 | Field           | Type   | Description                                               |
 |-----------------|--------|-----------------------------------------------------------|
+| `id`            | string | Image UUID (S3 object ID)                                 |
 | `name`          | string | Original filename                                         |
 | `latitude`      | string | Decimal latitude string                                   |
 | `longitude`     | string | Decimal longitude string                                  |
@@ -136,6 +138,34 @@ The presigned form expires in **1 hour**.
 **Response `400`** — one or more required fields are missing.
 
 **Response `401`** — missing or invalid token.
+
+---
+
+### `DELETE /api/v0/images/{imageID}`
+
+Deletes an image uploaded by the authenticated user. The user can only delete images they uploaded.
+
+**Headers**
+
+| Header          | Required | Description          |
+|-----------------|----------|----------------------|
+| `Authorization` | Yes      | `Bearer <id-token>`  |
+
+**Path Parameters**
+
+| Parameter | Description                        |
+|-----------|---------------------------------|
+| `imageID` | UUID of the image to delete (from the `id` field in GET /images) |
+
+**Response `204`** — Image successfully deleted. No response body.
+
+**Response `400`** — Invalid request (missing imageID).
+
+**Response `401`** — Missing or invalid token.
+
+**Response `404`** — Image not found or does not belong to the user.
+
+**Response `500`** — Server error during deletion.
 
 ---
 
