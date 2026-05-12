@@ -59,12 +59,22 @@ func corsHeaders() map[string]string {
 	}
 }
 
+func noContentHeaders() map[string]string {
+	return map[string]string{
+		"Access-Control-Allow-Origin": "*",
+	}
+}
+
 func jsonResponse(statusCode int, payload any) Response {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return errorResponse(500, err)
 	}
 	return Response{StatusCode: statusCode, Body: string(body), Headers: corsHeaders()}
+}
+
+func noContentResponse(statusCode int) Response {
+	return Response{StatusCode: statusCode, Headers: noContentHeaders()}
 }
 
 func errorResponse(statusCode int, err error) Response {
@@ -133,6 +143,37 @@ func Handler(ctx context.Context, req Request, srv server.Server, tokenVerifier 
 		return jsonResponse(200, output)
 
 	default:
+		// Handle DELETE /api/v0/images/{imageID}
+		if method == "DELETE" && strings.HasPrefix(req.Path, "/api/v0/images/") {
+			imagePath := strings.TrimPrefix(req.Path, "/api/v0/images/")
+			if imagePath == "" {
+				return errorResponse(400, server.ErrImageIDRequired)
+			}
+			if strings.Contains(imagePath, "/") {
+				return errorResponse(404, errors.New("not found"))
+			}
+
+			claims, err := authenticateRequest(ctx, req, tokenVerifier)
+			if err != nil {
+				return errorResponse(401, err)
+			}
+
+			input := server.DeleteInput{ImageID: imagePath}
+			err = srv.Delete(claims.CognitoUser, input)
+			if err != nil {
+				switch {
+				case errors.Is(err, server.ErrImageIDRequired):
+					return errorResponse(400, err)
+				case errors.Is(err, server.ErrImageNotFound):
+					return errorResponse(404, err)
+				default:
+					return errorResponse(500, err)
+				}
+			}
+
+			return noContentResponse(204)
+		}
+
 		return errorResponse(404, errors.New("not found"))
 	}
 }

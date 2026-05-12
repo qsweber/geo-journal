@@ -1,4 +1,4 @@
-package server
+package clients
 
 import (
 	"crypto/hmac"
@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -28,6 +30,7 @@ type ImageMetadata struct {
 }
 
 type Image struct {
+	ID           string
 	Metadata     ImageMetadata
 	PresignedURL string
 }
@@ -35,7 +38,10 @@ type Image struct {
 type S3Client interface {
 	CreatePresignedPost(userID string, imageMetadata ImageMetadata) (string, map[string]string, error)
 	GetImages(userID string) ([]Image, error)
+	DeleteImage(userID, imageID string) error
 }
+
+var ErrImageNotFound = errors.New("image not found")
 
 type s3Client struct {
 	bucket string
@@ -225,7 +231,7 @@ func (c *s3Client) getImage(key string) (Image, error) {
 		Longitude: getMetadataValue(rawMetadata, "longitude"),
 	}
 
-	return Image{Metadata: metadata, PresignedURL: presignedURL}, nil
+	return Image{ID: path.Base(key), Metadata: metadata, PresignedURL: presignedURL}, nil
 }
 
 func getMetadataValue(metadata map[string]*string, key string) string {
@@ -234,4 +240,32 @@ func getMetadataValue(metadata map[string]*string, key string) string {
 		return ""
 	}
 	return *value
+}
+
+func (c *s3Client) DeleteImage(userID, imageID string) error {
+	key := path.Join(userID, imageID)
+
+	// We intentionally preflight with HeadObject so DELETE can return 404 when the
+	// object does not exist for this user, matching the API contract. This adds an
+	// extra S3 call (and cost) per successful delete in exchange for that behavior.
+	_, err := c.svc.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var requestErr awserr.RequestFailure
+		if errors.As(err, &requestErr) && requestErr.StatusCode() == 404 {
+			return ErrImageNotFound
+		}
+		return fmt.Errorf("head object: %w", err)
+	}
+
+	_, err = c.svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("delete object: %w", err)
+	}
+	return nil
 }
