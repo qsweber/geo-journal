@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/apigateway"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -95,53 +92,7 @@ func main() {
 			return err
 		}
 
-		// Create the S3 bucket for image uploads
-		bucketName := projectStackName + "-uploads"
-		uploadBucket, err := s3.NewBucketV2(ctx, bucketName, &s3.BucketV2Args{
-			Bucket: pulumi.String(bucketName),
-			Tags: pulumi.StringMap{
-				"Project": pulumi.String(ctx.Project()),
-				"Stack":   pulumi.String(ctx.Stack()),
-			},
-		})
-		if err != nil {
-			return err
-		}
-
-		// Block all public access to the bucket
-		_, err = s3.NewBucketPublicAccessBlock(ctx, bucketName+"-public-access-block", &s3.BucketPublicAccessBlockArgs{
-			Bucket:                uploadBucket.ID(),
-			BlockPublicAcls:       pulumi.Bool(true),
-			BlockPublicPolicy:     pulumi.Bool(true),
-			IgnorePublicAcls:      pulumi.Bool(true),
-			RestrictPublicBuckets: pulumi.Bool(true),
-		})
-		if err != nil {
-			return err
-		}
-
-		// Attach an IAM policy granting the Lambda role access to the upload bucket
-		s3Policy, err := iam.NewRolePolicy(ctx, projectStackName+"-lambda-s3-policy", &iam.RolePolicyArgs{
-			Role: role.Name,
-			Policy: uploadBucket.Arn.ApplyT(func(arn string) string {
-				return fmt.Sprintf(`{
-	"Version": "2012-10-17",
-	"Statement": [{
-		"Effect": "Allow",
-		"Action": [
-			"s3:PutObject",
-			"s3:GetObject",
-			"s3:HeadObject",
-			"s3:ListBucket"
-		],
-		"Resource": [
-			"%s",
-			"%s/*"
-		]
-	}]
-}`, arn, arn)
-			}).(pulumi.StringOutput),
-		})
+		uploadBucket, s3Policy, bucketName, err := setupUploadBucket(ctx, projectStackName, role.Name)
 		if err != nil {
 			return err
 		}
