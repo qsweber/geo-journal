@@ -1,0 +1,112 @@
+name: CI Workflow
+
+on:
+  workflow_call:
+    inputs:
+      stack:
+        required: true
+        type: string
+        description: "CDK stack environment suffix (dev or prod)"
+      environment:
+        required: true
+        type: string
+        description: "GitHub environment name (dev or prod)"
+      run-deploy:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to run the deploy job"
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version: "1.25.0"
+      - name: Check formatting
+        run: |
+          UNFORMATTED=$(gofmt -l $(find . -name '*.go' -not -path './vendor/*' -not -path './cdk/*' -not -path './old/*'))
+          if [ -n "$UNFORMATTED" ]; then
+            echo "These files are not gofmt-formatted:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+      - name: Run go vet
+        run: go vet ./...
+      - run: make build-lambda
+      - run: go version
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: build
+          path: |
+            ./handler.zip
+
+  cdk-checks:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version: "1.25.0"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: build
+      - name: Check formatting (cdk)
+        run: |
+          UNFORMATTED=$(gofmt -l $(find ./cdk -name '*.go' -not -path './cdk/node_modules/*'))
+          if [ -n "$UNFORMATTED" ]; then
+            echo "These files are not gofmt-formatted:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+      - name: Run go vet (cdk)
+        run: cd cdk && go vet .
+      - name: Install CDK CLI
+        run: cd cdk && npm ci
+      - name: Validate CDK app synthesizes
+        run: cd cdk && npx cdk synth --all
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build, cdk-checks]
+    if: ${{ inputs.run-deploy }}
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v5.5.0
+        with:
+          go-version: "1.25.0"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: build
+      - name: Install CDK CLI
+        run: cd cdk && npm ci
+      - name: Deploy stack
+        run: cd cdk && npx cdk deploy geo-journal-${{ inputs.stack }} --require-approval never
+      - name: Verify deployed API (/api/v0/status)
+        run: |
+          STACK_NAME=geo-journal-${{ inputs.stack }}
+          CUSTOM_DOMAIN_URL=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_REGION" --query "Stacks[0].Outputs[?OutputKey=='CustomDomainURL'].OutputValue" --output text)
+          STATUS_URL="${CUSTOM_DOMAIN_URL}/api/v0/status?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "Calling $STATUS_URL"
+          curl --fail --show-error --silent "$STATUS_URL"
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}

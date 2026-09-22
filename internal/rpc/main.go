@@ -56,12 +56,14 @@ func corsHeaders() map[string]string {
 	return map[string]string{
 		"Access-Control-Allow-Origin": "*",
 		"Content-Type":                "application/json",
+		"Cache-Control":               "no-store",
 	}
 }
 
 func noContentHeaders() map[string]string {
 	return map[string]string{
 		"Access-Control-Allow-Origin": "*",
+		"Cache-Control":               "no-store",
 	}
 }
 
