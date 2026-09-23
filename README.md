@@ -6,12 +6,12 @@ This repository contains:
 - An AWS Lambda entrypoint at cmd/lambda/main.go
 - Shared business logic in internal/server
 - Shared request routing in internal/rpc
-- Pulumi infrastructure code in infrastructure
+- AWS CDK (Go) infrastructure code in cdk
 
 ## Prerequisites
 
 1. Go 1.24+
-2. (Optional, for deployment) Pulumi CLI and AWS credentials
+2. (Optional, for deployment) Node.js 20+, the AWS CDK CLI, and AWS credentials
 
 ## Run The API Locally
 
@@ -56,7 +56,7 @@ curl -i -X POST \
 Expected body for successful status request:
 
 ```json
-{"text":"ok"}
+{"text":"ok","timestamp":"2026-01-01T00:00:00Z"}
 ```
 
 ## Local Auth Behavior
@@ -95,29 +95,45 @@ This produces:
 - bootstrap
 - handler.zip
 
-## Deploy With Pulumi
+## Deploy With CDK
 
-1. Initialize/select a stack:
+The `cdk/` directory is a standalone Go module containing a CDK app that defines two stacks,
+`geo-journal-dev` and `geo-journal-prod`, each targeting `us-west-2`. It also owns the Cognito
+user pool/client and SES domain identity used for authentication - the paired
+[geo-journal-web](https://github.com/qsweber/geo-journal-web) frontend just consumes the
+resulting pool ID/client ID as config.
 
-```bash
-pulumi stack init dev
-```
-
-2. Set AWS region:
-
-```bash
-pulumi config set aws:region us-west-2
-```
-
-3. Deploy:
+1. Install the pinned CDK CLI (only needed once):
 
 ```bash
-pulumi up
+cd cdk && npm install
 ```
 
-4. Tear down when done:
+2. One-time per AWS account/region, bootstrap the CDK toolkit:
 
 ```bash
-pulumi destroy --yes
-pulumi stack rm --yes
+npx cdk bootstrap aws://<account-id>/us-west-2
 ```
+
+3. Build the Lambda artifact (from the repo root) so the CDK app has something to package:
+
+```bash
+make build-lambda
+```
+
+4. Review and deploy a stack:
+
+```bash
+cd cdk
+npx cdk diff geo-journal-dev        # or geo-journal-prod
+npx cdk deploy geo-journal-dev
+```
+
+5. Tear down when done:
+
+```bash
+npx cdk destroy geo-journal-dev
+```
+
+Note: the Cognito user pool/client and SES domain identity/Route53 records are deployed with a
+`RETAIN` removal policy, so `cdk destroy` will leave them in place.
