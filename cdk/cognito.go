@@ -53,7 +53,7 @@ func createCognitoResources(scope constructs.Construct, cfg EnvConfig, sesIdenti
 				TemporaryPasswordValidityDays: jsii.Number(7),
 			},
 			SignInPolicy: &awscognito.CfnUserPool_SignInPolicyProperty{
-				AllowedFirstAuthFactors: jsii.Strings("PASSWORD"),
+				AllowedFirstAuthFactors: jsii.Strings("PASSWORD", "WEB_AUTHN"),
 			},
 		},
 		UserPoolTier:       jsii.String("ESSENTIALS"),
@@ -63,6 +63,11 @@ func createCognitoResources(scope constructs.Construct, cfg EnvConfig, sesIdenti
 			EmailMessage:       jsii.String("Your verification code is {####}"),
 			EmailSubject:       jsii.String("Verify your email with " + domain),
 		},
+		// Lets users register and sign in with a passkey as an alternative to a
+		// password, on top of the existing PASSWORD first factor above.
+		WebAuthnFactorConfiguration: jsii.String("SINGLE_FACTOR"),
+		WebAuthnRelyingPartyId:      jsii.String(domain),
+		WebAuthnUserVerification:    jsii.String("preferred"),
 	})
 	userPool.AddDependency(sesIdentity)
 	userPool.ApplyRemovalPolicy(awscdk.RemovalPolicy_RETAIN, nil)
@@ -76,6 +81,9 @@ func createCognitoResources(scope constructs.Construct, cfg EnvConfig, sesIdenti
 			"ALLOW_REFRESH_TOKEN_AUTH",
 			"ALLOW_USER_PASSWORD_AUTH",
 			"ALLOW_USER_SRP_AUTH",
+			// USER_AUTH is the selection-based flow that Amplify's signIn(...)
+			// uses under the hood for passkey/WebAuthn authentication.
+			"ALLOW_USER_AUTH",
 		),
 		IdTokenValidity:            jsii.Number(60),
 		ClientName:                 jsii.String(domain + "-user-pool-client"),
